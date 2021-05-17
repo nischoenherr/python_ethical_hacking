@@ -52,6 +52,48 @@ def check_weakness(response):
     }
 
     for error in errors:
-        if error in response.content.decode.lower():
+        if error in response.content.decode().lower():
             return True
     return False
+
+
+# Main Function to scan for Injection opportunity
+def scan_for_injection(url):
+    for c in "\"'":
+        new_url = f"{url}{c}"
+        print("[!] Trying", new_url)
+
+        res = s.get(new_url)
+        if check_weakness(res):
+            print("[+] SQL Injection opportunity detected, link:", new_url)
+            return
+
+    forms = get_all_forms(url)
+    print(f"[+] Detected {len(forms)} forms on {url}.")
+    for form in forms:
+        form_details = get_form_details(form)
+        for c in "\"'":
+            data = {}
+            for input_tag in form_details["inputs"]:
+                if input_tag["type"] == "hidden" or input_tag["value"]:
+                    try:
+                        data[input_tag["name"]] = input_tag["value"] + c
+                    except:
+                        pass
+                elif input_tag["type"] != "submit":
+                    data[input_tag["name"]] = f"test{c}"
+            url = urljoin(url, form_details["action"])
+            if form_details["method"] == "get":
+                res = s.get(url, params=data)
+
+                if check_weakness(res):
+                    print("[+] SQL Injection opportunity detected, link:", url)
+                    print("[+] Form:")
+                    pprint(form_details)
+                    break
+
+
+# Test Sql Injection by URL
+if __name__ == "__main__":
+    url = "https://www.hacksplaining.com/exercises/sql-injection#/first-login-attempt"
+    scan_for_injection(url)
